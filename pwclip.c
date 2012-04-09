@@ -2,7 +2,7 @@
  * pwclip.c
  * Utility app which allows to input a password and temporarily put in
  * on clipboard. Clear clipboard on exit.
- * First real experiment with GTK+2.0 code.
+ * First experiment with GTK+ coding.
  *
  * TODO clear clipboard on interrupt/term OS signals as well.
  *
@@ -10,7 +10,6 @@
  */
 
 #include <gtk/gtk.h>
-#include <glib/gprintf.h>
 #include "pwclip.h"
 
 /*
@@ -32,10 +31,9 @@ static gboolean delete_event( GtkWidget *widget,
   return FALSE;
 }
 
-/* Destroy handler. Clears clipboard and quits app. */
-static void destroy( GtkWidget *widget,
-                     gpointer   data ) {
-  GtkClipboard* cb = gtk_clipboard_get(NULL);
+/* Top level window destroy handler. Clears clipboard and quits app. */
+static void destroy(GtkWidget *widget, gpointer   data) {
+  GtkClipboard *cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
   gtk_clipboard_clear(cb);
   gtk_main_quit();
 }
@@ -50,25 +48,24 @@ static void set_clipboard_handler(GtkWidget *widget, gpointer data) {
   if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(data)) && text->len) {
     text = g_string_append(text, "\n");
   }
-  
+
   gtk_clipboard_set_text(cb, text->str, -1);
-  
-  gtk_clipboard_store(cb);
   g_string_free(text, TRUE);
 }
 
-static void clipboard_owner_change_handler(GtkClipboard* clipboard, GdkEvent* event, gpointer data) {
-  g_print("Owner change event occured");
+static gboolean is_current_password_on_clipboard(GtkClipboard *cb, GtkEntry *entry) {
+  gboolean retval = FALSE;
+  gchar* clipboard_text = gtk_clipboard_wait_for_text(cb);
+  if (clipboard_text) g_strchomp(clipboard_text);
 
-  gint x,y;
-  GdkWindow* owner = gdk_selection_owner_get(GDK_SELECTION_CLIPBOARD);
-  if (owner) {
-    gdk_window_get_position(owner, &x, &y);
-    g_printf("Owner position: x=%d, y=%d\n", x,y);
-  } else {
-    g_print("Owner NULL!");
+  if (gtk_entry_get_text_length(entry) && clipboard_text) {
+    if (g_strcmp0(clipboard_text, gtk_entry_get_text(entry)) == 0) {
+      retval = TRUE;
+    }
   }
-
+  
+  g_free(clipboard_text);
+  return retval;
 }
 
 static GdkPixbuf* get_icon_pixbuf(void) {
@@ -80,22 +77,19 @@ static GdkPixbuf* get_icon_pixbuf(void) {
 }
 
 /*
- * Update status, expect window widget as custom data.
+ * Handles owner-change events for clipboard, updates status.
+ * Requires top-level GTK window as data.
  */
-static void status_handler(GtkWidget *widget, gpointer data) {
-  GtkWidget *label_status = g_object_get_data(data, "label_status");
-  guint16 len = gtk_entry_get_text_length(GTK_ENTRY(widget));
-
-  if (len) {
-    gtk_label_set_text(GTK_LABEL(label_status), "<b><span color='red'>PASSWORD SET ON CLIPBOARD</span></b>");
-    gtk_label_set_use_markup(GTK_LABEL(label_status), TRUE);
+static void clipboard_status_handler(GtkClipboard *cb, GdkEvent *event, gpointer gtk_window) {
+  GtkLabel *status = g_object_get_data(gtk_window, "label_status");
+  GtkEntry *entry = g_object_get_data(gtk_window, "entry_pw");
+  
+  if (is_current_password_on_clipboard(cb, entry)) {
+    gtk_label_set_text(status, "<b><span color='red'>PASSWORD SET ON CLIPBOARD</span></b>");
+    gtk_label_set_use_markup(status, TRUE);
   } else {
-    gtk_label_set_text(GTK_LABEL(label_status), "No password set.");
+    gtk_label_set_text(status, "No password set.");
   }
-}
-
-static void set_window_icon(GtkWidget *window) {
-  gtk_window_set_icon(GTK_WINDOW(window), get_icon_pixbuf());
 }
 
 /* Moves window to top right corner */
@@ -109,13 +103,15 @@ static void move_window(GtkWidget *window) {
   gtk_window_move(GTK_WINDOW(window), screen_width - width - 10, 30);
 }
 
-/* Set up window  accelerators/keybindings */
-static void set_keybindings(GtkWidget *window) {
-  /* Set up CTRL+Q on window to call destroy signal handler */
+/* Set up window accelerators/keybindings */
+static void set_global_keybindings(GtkWidget *window) {
   GtkAccelGroup *accel_group = gtk_accel_group_new();
-  GClosure* closure = g_cclosure_new(G_CALLBACK(destroy), NULL, NULL);
   
-  gtk_accel_group_connect(accel_group, (guint)'q', GDK_CONTROL_MASK, GTK_ACCEL_LOCKED, closure);
+  // CTRL+Q or CTRL+W to quit:
+  gtk_accel_group_connect(accel_group, (guint)'q', GDK_CONTROL_MASK, GTK_ACCEL_LOCKED,
+                          g_cclosure_new(G_CALLBACK(destroy), NULL, NULL));
+  gtk_accel_group_connect(accel_group, (guint)'w', GDK_CONTROL_MASK, GTK_ACCEL_LOCKED,
+                          g_cclosure_new(G_CALLBACK(destroy), NULL, NULL));
   gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
 }
 
@@ -133,10 +129,6 @@ int main(int argc, char *argv[] ) {
    * from the command line and are returned to the application. */
   gtk_init (&argc, &argv);
 
-  GtkClipboard* cb = gtk_clipboard_get(NULL);
-  g_signal_connect(cb, "owner-change", G_CALLBACK(clipboard_owner_change_handler), NULL);
-
-    
   /* create a new window */
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
@@ -148,9 +140,9 @@ int main(int argc, char *argv[] ) {
   gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
   gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
   gtk_window_stick(GTK_WINDOW(window));
-  set_window_icon(window);
-  set_keybindings(window);
-    
+  gtk_window_set_icon(GTK_WINDOW(window), get_icon_pixbuf());
+  set_global_keybindings(window);
+
   /* When the window is given the "delete-event" signal (this is given
    * by the window manager, usually by the "close" option, or on the
    * titlebar), we ask it to call the delete_event () function
@@ -164,44 +156,51 @@ int main(int argc, char *argv[] ) {
    * or if we return FALSE in the "delete-event" callback. */
   g_signal_connect (window, "destroy",
                     G_CALLBACK (destroy), NULL);
-    
-  /* Set up vertical box container */
-  vbox = gtk_vbox_new(TRUE, 5);
 
-  label_info = gtk_label_new("Type password and press <i>RETURN</i> to set on clipboard.");
+  // Set up signal handling for clipboard events:
+  GtkClipboard* clipboard = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+  g_signal_connect(clipboard, "owner-change",
+                   G_CALLBACK(clipboard_status_handler), window);
+    
+  // Set up vertical box container:
+  vbox = gtk_vbox_new(TRUE, 0);
+
+  label_info = gtk_label_new("Type password to set on clipboard.");
   gtk_label_set_line_wrap(GTK_LABEL(label_info), TRUE);
   gtk_label_set_use_markup(GTK_LABEL(label_info), TRUE);
-  gtk_label_set_width_chars(GTK_LABEL(label_info), 30);
-  gtk_label_set_justify(GTK_LABEL(label_info), GTK_JUSTIFY_LEFT);
+  gtk_misc_set_alignment(GTK_MISC(label_info), 0.0f, .5f);
 
   hboxtop = gtk_hbox_new(FALSE,0);
   gtk_box_pack_start(GTK_BOX(hboxtop), label_info, TRUE, TRUE, 0);
   image_icon = gtk_image_new_from_pixbuf(get_icon_pixbuf());
-  gtk_box_pack_start(GTK_BOX(hboxtop), image_icon, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hboxtop), image_icon, TRUE, TRUE, 0);
   
-  hbox1 = gtk_hbox_new(FALSE, 2);
+  hbox1 = gtk_hbox_new(FALSE, 0);
   label_pw = gtk_label_new_with_mnemonic("_Password:");
+  gtk_misc_set_alignment(GTK_MISC(label_pw), 0.0f, .5f);
   gtk_box_pack_start(GTK_BOX(hbox1), label_pw, TRUE, TRUE, 0);
 
   check_button_toggle_newline = gtk_check_button_new_with_mnemonic("_Append newline to password text.");
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_button_toggle_newline), TRUE);
-  entry_pw = gtk_entry_new_with_max_length(20);
+  entry_pw = gtk_entry_new_with_max_length(MAX_PW_LEN);
   gtk_entry_set_visibility(GTK_ENTRY(entry_pw), FALSE);
+
+  g_signal_connect(entry_pw, "changed", G_CALLBACK(set_clipboard_handler), check_button_toggle_newline);
   g_signal_connect(entry_pw, "activate", G_CALLBACK(set_clipboard_handler), check_button_toggle_newline);
-  // When checkbox is toggled, trigger entry activation signal to update clipboard and status:
-  g_signal_connect_swapped(check_button_toggle_newline, "toggled", G_CALLBACK(gtk_widget_activate), entry_pw);
+  // When checkbox is toggled, trigger set_clipboard_handler as well:
+  g_signal_connect_swapped(check_button_toggle_newline,  "toggled", G_CALLBACK(set_clipboard_handler), entry_pw);
   gtk_box_pack_start(GTK_BOX(hbox1), entry_pw, TRUE, TRUE, 0);
 
   // Connect mnemoic for "Password:"-label to entry widget
   gtk_label_set_mnemonic_widget(GTK_LABEL(label_pw), entry_pw);
+  // Add entry_pw as custom data on window object:
+  g_object_set_data(G_OBJECT(window), "entry_pw", entry_pw);
   
   // Status label
   label_status = gtk_label_new("No password set.");
+  /* gtk_misc_set_alignment(GTK_MISC(label_status), 0.0f, .5f); */
   // Set custom data object on window object, with key "label_status":
   g_object_set_data(G_OBJECT(window), "label_status", label_status);
-  // Pass window object as custom data to status_handler callback, which will fetch label_status
-  // from window as property with key "label_status":
-  g_signal_connect(entry_pw, "activate", G_CALLBACK(status_handler), window);
 
   // Creates a new button with label
   button_quit = gtk_button_new_with_label ("_Quit and clear clipboard");
@@ -214,17 +213,18 @@ int main(int argc, char *argv[] ) {
                             G_CALLBACK (gtk_widget_destroy),
                             window);
 
+  // Pack child widgets into vertical box
   gtk_box_pack_start(GTK_BOX(vbox), hboxtop, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(vbox), hbox1, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(vbox), check_button_toggle_newline, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(vbox), label_status, TRUE, TRUE, 0);
   gtk_box_pack_start(GTK_BOX(vbox), button_quit, TRUE, TRUE, 0);
   
-  /* This packs the button into the window (a gtk container). */
+  // Add vertical box container into top level window:
   gtk_container_add(GTK_CONTAINER(window), vbox);
     
   /* The final step is to display this newly created widget hierarchy: */
-  // call gtk_widget_show_all on root widget:
+  // call gtk_widget_show_all from root widget:
   gtk_widget_show_all(window);
 
   // Instead of calling show individually for all created widgets:

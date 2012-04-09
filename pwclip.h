@@ -1,5 +1,7 @@
 /* GdkPixbuf RGBA C-Source image dump */
 
+#define MAX_PW_LEN 25
+
 #ifdef __SUNPRO_C
 #pragma align 4 (pw_icon_data)
 #endif
