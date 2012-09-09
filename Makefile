@@ -2,13 +2,15 @@
 # Basic setup with compilation and linking flags for GTK+2.0
 
 CC = gcc
-CFLAGS = -I. $(shell pkg-config --cflags gtk+-2.0) \
+CFLAGS = -I. $(shell pkg-config --cflags gtk+-3.0) \
          -Wall -Wunused \
          -DG_DISABLE_DEPRECATED \
          -DGDK_DISABLE_DEPRECATED \
-         -DGDK_PIXBUF_DISABLE_DEPRECATED
+         -DGDK_PIXBUF_DISABLE_DEPRECATED \
+         -DGTK_DISABLE_SINGLE_INCLUDES \
+         -DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED
 
-LIBS = $(shell pkg-config --libs gtk+-2.0)
+LIBS = $(shell pkg-config --libs gtk+-3.0)
 # For header file dependencies:
 DEPS = pwclip.h
 
@@ -24,6 +26,7 @@ OBJ = pwclip.o
 pwclip: $(OBJ)
 	gcc -o $@ $^ $(CFLAGS) $(LIBS)
 
+# Declare `clean' to be phony (not an object):
 .PHONY: clean
 
 clean:

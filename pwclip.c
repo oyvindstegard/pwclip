@@ -163,26 +163,27 @@ int main(int argc, char *argv[] ) {
                    G_CALLBACK(clipboard_status_handler), window);
     
   // Set up vertical box container:
-  vbox = gtk_vbox_new(TRUE, 0);
+  vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
   label_info = gtk_label_new("Type password to set on clipboard.");
   gtk_label_set_line_wrap(GTK_LABEL(label_info), TRUE);
   gtk_label_set_use_markup(GTK_LABEL(label_info), TRUE);
   gtk_misc_set_alignment(GTK_MISC(label_info), 0.0f, .5f);
 
-  hboxtop = gtk_hbox_new(FALSE,0);
+  hboxtop = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_box_pack_start(GTK_BOX(hboxtop), label_info, TRUE, TRUE, 0);
   image_icon = gtk_image_new_from_pixbuf(get_icon_pixbuf());
   gtk_box_pack_start(GTK_BOX(hboxtop), image_icon, TRUE, TRUE, 0);
   
-  hbox1 = gtk_hbox_new(FALSE, 0);
+  hbox1 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   label_pw = gtk_label_new_with_mnemonic("_Password:");
   gtk_misc_set_alignment(GTK_MISC(label_pw), 0.0f, .5f);
   gtk_box_pack_start(GTK_BOX(hbox1), label_pw, TRUE, TRUE, 0);
 
   check_button_toggle_newline = gtk_check_button_new_with_mnemonic("_Append newline to password text.");
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_button_toggle_newline), TRUE);
-  entry_pw = gtk_entry_new_with_max_length(MAX_PW_LEN);
+  entry_pw = gtk_entry_new();
+  gtk_entry_set_max_length(GTK_ENTRY(entry_pw), MAX_PW_LEN);
   gtk_entry_set_visibility(GTK_ENTRY(entry_pw), FALSE);
 
   g_signal_connect(entry_pw, "changed", G_CALLBACK(set_clipboard_handler), check_button_toggle_newline);
@@ -240,6 +241,9 @@ int main(int argc, char *argv[] ) {
   /* All GTK applications must have a gtk_main(). Control ends here
    * and waits for an event to occur (like a key press or
    * mouse event). */
+
+  g_printf("Calling gtk_main()\n");
+  
   gtk_main ();
     
   return 0;
