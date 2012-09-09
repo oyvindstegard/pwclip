@@ -10,6 +10,9 @@
  */
 
 #include <gtk/gtk.h>
+#include <gdk/gdkkeysyms.h>
+#include <glib/gprintf.h>
+
 #include "pwclip.h"
 
 /*
@@ -32,7 +35,7 @@ static gboolean delete_event( GtkWidget *widget,
 }
 
 /* Top level window destroy handler. Clears clipboard and quits app. */
-static void destroy(GtkWidget *widget, gpointer   data) {
+static void destroy(GtkWidget *widget, gpointer data) {
   GtkClipboard *cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
   gtk_clipboard_clear(cb);
   gtk_main_quit();
@@ -103,16 +106,29 @@ static void move_window(GtkWidget *window) {
   gtk_window_move(GTK_WINDOW(window), screen_width - width - 10, 30);
 }
 
+/* Looks for ESC key press, and quits if received. Otherwise lets event
+   propagate further. */
+static gboolean esc_key_press_handler(GtkWidget *widget, GdkEvent *event, gpointer data) {
+  GdkEventKey event_key = event->key;
+  if (event_key.keyval == GDK_KEY_Escape) {
+    destroy(widget, NULL);
+    return TRUE;
+  }
+  return FALSE;
+}
+
 /* Set up window accelerators/keybindings */
 static void set_global_keybindings(GtkWidget *window) {
   GtkAccelGroup *accel_group = gtk_accel_group_new();
   
-  // CTRL+Q or CTRL+W to quit:
+  // CTRL+Q to quit:
   gtk_accel_group_connect(accel_group, (guint)'q', GDK_CONTROL_MASK, GTK_ACCEL_LOCKED,
                           g_cclosure_new(G_CALLBACK(destroy), NULL, NULL));
-  gtk_accel_group_connect(accel_group, (guint)'w', GDK_CONTROL_MASK, GTK_ACCEL_LOCKED,
-                          g_cclosure_new(G_CALLBACK(destroy), NULL, NULL));
   gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
+
+  // ESC to quit:
+  g_signal_connect (window, "key-press-event",
+                    G_CALLBACK (esc_key_press_handler), NULL);
 }
 
 int main(int argc, char *argv[] ) {
@@ -142,6 +158,7 @@ int main(int argc, char *argv[] ) {
   gtk_window_stick(GTK_WINDOW(window));
   gtk_window_set_icon(GTK_WINDOW(window), get_icon_pixbuf());
   set_global_keybindings(window);
+  
 
   /* When the window is given the "delete-event" signal (this is given
    * by the window manager, usually by the "close" option, or on the
@@ -242,8 +259,6 @@ int main(int argc, char *argv[] ) {
    * and waits for an event to occur (like a key press or
    * mouse event). */
 
-  g_printf("Calling gtk_main()\n");
-  
   gtk_main ();
     
   return 0;
