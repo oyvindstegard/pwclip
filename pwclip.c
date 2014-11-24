@@ -9,6 +9,7 @@
  * Author: Øyvind Stegard <oyvinst@ifi.uio.no>
  */
 
+#include <string.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <glib/gprintf.h>
@@ -49,9 +50,9 @@ static void set_clipboard_handler(GtkWidget *widget, gpointer data) {
 
   // If extra newline is requested, then append it.
   if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(data)) && text->len) {
-    text = g_string_append(text, "\n");
+    text = g_string_append_c(text, '\n');
   }
-
+  
   gtk_clipboard_set_text(cb, text->str, -1);
   g_string_free(text, TRUE);
 }
@@ -59,15 +60,20 @@ static void set_clipboard_handler(GtkWidget *widget, gpointer data) {
 static gboolean is_current_password_on_clipboard(GtkClipboard *cb, GtkEntry *entry) {
   gboolean retval = FALSE;
   gchar* clipboard_text = gtk_clipboard_wait_for_text(cb);
-  if (clipboard_text) g_strchomp(clipboard_text);
+  if (clipboard_text) {
+      // Snip any trailing newline of clipboard text before compare
+      if (g_str_has_suffix(clipboard_text, "\n")) {
+          size_t newLen = strlen(clipboard_text) - 1;
+          clipboard_text[newLen] = 0;
+      }
 
-  if (gtk_entry_get_text_length(entry) && clipboard_text) {
-    if (g_strcmp0(clipboard_text, gtk_entry_get_text(entry)) == 0) {
-      retval = TRUE;
-    }
+      if (g_strcmp0(clipboard_text, gtk_entry_get_text(entry)) == 0) {
+          retval = TRUE;
+      }
+
+      g_free(clipboard_text);
   }
   
-  g_free(clipboard_text);
   return retval;
 }
 

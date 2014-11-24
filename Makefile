@@ -1,5 +1,5 @@
 # Simple makefile for pwclip
-# Basic setup with compilation and linking flags for GTK+2.0
+# Basic setup with compilation and linking flags for GTK+3.0
 
 CC = gcc
 CFLAGS = -I. $(shell pkg-config --cflags gtk+-3.0) \
