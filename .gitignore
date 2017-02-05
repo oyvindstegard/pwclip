@@ -1,6 +1,6 @@
 *.[oa]
-pwclip
+/target/
 TAGS
+/data.c
 .gitattributes
 .emacs.desktop
-
