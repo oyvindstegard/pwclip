@@ -2,11 +2,10 @@
  * pwclip.c
  * Utility app which allows to input a password and temporarily put in
  * on clipboard. Clear clipboard on exit.
- * First experiment with GTK+ coding.
  *
  * TODO clear clipboard on interrupt/term OS signals as well.
  *
- * Author: Øyvind Stegard <oyvinst@ifi.uio.no>
+ * Author: Øyvind Stegard <oyvinst@stegard.net>
  */
 
 #include <string.h>
@@ -78,11 +77,16 @@ static gboolean is_current_password_on_clipboard(GtkClipboard *cb, GtkEntry *ent
 }
 
 static GdkPixbuf* get_icon_pixbuf(void) {
-  static GdkPixbuf* pixbuf;
-  if (!pixbuf) {
-    pixbuf = gdk_pixbuf_new_from_inline(-1, pw_icon_data, FALSE, NULL);
-  }
-  return pixbuf;
+    static GdkPixbuf* icon_fullsize = NULL;
+    if (icon_fullsize == NULL) {
+        GError* err = NULL;
+        icon_fullsize = gdk_pixbuf_new_from_resource(PWCLIP_ICON_RESOURCE, &err);
+        if (err != NULL) {
+            g_fprintf(stderr, "Unable to load resource: %s\n", err->message);
+            g_error_free(err);
+        }
+    }
+    return icon_fullsize;
 }
 
 /*
@@ -138,6 +142,7 @@ static void set_global_keybindings(GtkWidget *window) {
 }
 
 int main(int argc, char *argv[] ) {
+
   /* GtkWidget is the general storage type for widgets */
   GtkWidget *window;
   GtkWidget *vbox, *hbox1, *hboxtop;

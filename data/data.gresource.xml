@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GResource bundle manifest -->
+<gresources>
+  <gresource prefix="/net/stegard/pwclip">
+    <file preprocess="to-pixdata">icon.png</file>
+  </gresource>
+</gresources>
