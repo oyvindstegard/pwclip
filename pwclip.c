@@ -4,6 +4,7 @@
  * on clipboard. Clear clipboard on exit.
  *
  * TODO clear clipboard on interrupt/term OS signals as well.
+ * Version 1.1
  *
  * Author: Øyvind Stegard <oyvinst@stegard.net>
  */
@@ -51,42 +52,40 @@ static void set_clipboard_handler(GtkWidget *widget, gpointer data) {
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(data)) && text->len) {
         text = g_string_append_c(text, '\n');
     }
-  
+
     gtk_clipboard_set_text(cb, text->str, -1);
     g_string_free(text, TRUE);
 }
 
-static gboolean is_current_password_on_clipboard(GtkClipboard *cb, GtkEntry *entry) {
+static gboolean is_current_password_found_on_clipboard(GtkClipboard *cb, GtkEntry *entry) {
     gboolean retval = FALSE;
     gchar* clipboard_text = gtk_clipboard_wait_for_text(cb);
     if (clipboard_text) {
-        // Snip any trailing newline of clipboard text before compare
-        if (g_str_has_suffix(clipboard_text, "\n")) {
-            size_t newLen = strlen(clipboard_text) - 1;
-            clipboard_text[newLen] = 0;
-        }
-
-        if (g_strcmp0(clipboard_text, gtk_entry_get_text(entry)) == 0) {
+        // Search for secret in clipboard text
+        if (g_strstr_len(clipboard_text, -1, gtk_entry_get_text(entry))) {
             retval = TRUE;
         }
 
         g_free(clipboard_text);
     }
-  
+
     return retval;
 }
 
-static GdkPixbuf* get_icon_pixbuf(void) {
-    static GdkPixbuf* icon_fullsize = NULL;
-    if (icon_fullsize == NULL) {
-        GError* err = NULL;
-        icon_fullsize = gdk_pixbuf_new_from_resource(PWCLIP_ICON_RESOURCE, &err);
-        if (err != NULL) {
-            g_fprintf(stderr, "Unable to load resource: %s\n", err->message);
-            g_error_free(err);
-        }
+/* Return pointer to newly allocated GdkPixbuf with icon of requested width.
+ * The icon will be scaled to requested width while preserving aspect ratio.
+ * Returns NULL in case of error.
+ */
+static GdkPixbuf* get_icon_pixbuf(int width) {
+    GError* err = NULL;
+    GdkPixbuf* icon;
+    icon = gdk_pixbuf_new_from_resource_at_scale(PWCLIP_ICON_RESOURCE, width, -1, TRUE, &err);
+    if (err != NULL) {
+        g_fprintf(stderr, "Unable to load resource: %s\n", err->message);
+        g_error_free(err);
+        return NULL;
     }
-    return icon_fullsize;
+    return icon;
 }
 
 /*
@@ -96,12 +95,12 @@ static GdkPixbuf* get_icon_pixbuf(void) {
 static void clipboard_status_handler(GtkClipboard *cb, GdkEvent *event, gpointer gtk_window) {
     GtkLabel *status = g_object_get_data(gtk_window, "label_status");
     GtkEntry *entry = g_object_get_data(gtk_window, "entry_pw");
-  
-    if (is_current_password_on_clipboard(cb, entry)) {
-        gtk_label_set_text(status, "<b><span color='red'>PASSWORD SET ON CLIPBOARD</span></b>");
+
+    if (is_current_password_found_on_clipboard(cb, entry)) {
+        gtk_label_set_text(status, "<b><span color='red'>PASSWORD FOUND ON CLIPBOARD</span></b>");
         gtk_label_set_use_markup(status, TRUE);
     } else {
-        gtk_label_set_text(status, "No password set.");
+        gtk_label_set_text(status, "No password on clipboard.");
     }
 }
 
@@ -109,7 +108,7 @@ static void clipboard_status_handler(GtkClipboard *cb, GdkEvent *event, gpointer
 static void move_window(GtkWidget *window) {
     GdkScreen *default_screen;
     gint width, height, screen_width;
-  
+
     gtk_window_get_size(GTK_WINDOW(window), &width, &height);
     default_screen = gdk_screen_get_default();
     screen_width = gdk_screen_get_width(default_screen);
@@ -130,7 +129,7 @@ static gboolean esc_key_press_handler(GtkWidget *widget, GdkEvent *event, gpoint
 /* Set up window accelerators/keybindings */
 static void set_global_keybindings(GtkWidget *window) {
     GtkAccelGroup *accel_group = gtk_accel_group_new();
-  
+
     // CTRL+Q to quit:
     gtk_accel_group_connect(accel_group, (guint)'q', GDK_CONTROL_MASK, GTK_ACCEL_LOCKED,
                             g_cclosure_new(G_CALLBACK(destroy), NULL, NULL));
@@ -141,9 +140,19 @@ static void set_global_keybindings(GtkWidget *window) {
                       G_CALLBACK (esc_key_press_handler), NULL);
 }
 
-int main(int argc, char *argv[] ) {
-    g_fprintf(
+static void set_window_icon(GtkWidget *window) {
+    GdkPixbuf* icon128 = get_icon_pixbuf(128);
+    GdkPixbuf* icon256 = get_icon_pixbuf(256);
+    GList* icon_list = NULL;
+    icon_list = g_list_append(icon_list, icon128);
+    icon_list = g_list_append(icon_list, icon256);
+    gtk_window_set_icon_list(GTK_WINDOW(window), icon_list);
+    g_list_free(icon_list);
+    g_object_unref(icon128);
+    g_object_unref(icon256);
+}
 
+int main(int argc, char *argv[] ) {
 
     /* GtkWidget is the general storage type for widgets */
     GtkWidget *window;
@@ -169,9 +178,9 @@ int main(int argc, char *argv[] ) {
     gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
     gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
     gtk_window_stick(GTK_WINDOW(window));
-    gtk_window_set_icon(GTK_WINDOW(window), get_icon_pixbuf());
+
+    set_window_icon(window);
     set_global_keybindings(window);
-  
 
     /* When the window is given the "delete-event" signal (this is given
      * by the window manager, usually by the "close" option, or on the
@@ -180,8 +189,8 @@ int main(int argc, char *argv[] ) {
      * function is NULL and is ignored in the callback function. */
     g_signal_connect (window, "delete-event",
                       G_CALLBACK (delete_event), NULL);
-    
-    /* Here we connect the "destroy" event to a signal handler.  
+
+    /* Here we connect the "destroy" event to a signal handler.
      * This event occurs when we call gtk_widget_destroy() on the window,
      * or if we return FALSE in the "delete-event" callback. */
     g_signal_connect (window, "destroy",
@@ -191,23 +200,26 @@ int main(int argc, char *argv[] ) {
     GtkClipboard* clipboard = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
     g_signal_connect(clipboard, "owner-change",
                      G_CALLBACK(clipboard_status_handler), window);
-    
+
     // Set up vertical box container:
     vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-    label_info = gtk_label_new("Type password to set on clipboard.");
+    label_info = gtk_label_new("Type to put password on clipboard.");
     gtk_label_set_line_wrap(GTK_LABEL(label_info), TRUE);
     gtk_label_set_use_markup(GTK_LABEL(label_info), TRUE);
-    gtk_misc_set_alignment(GTK_MISC(label_info), 0.0f, .5f);
+    gtk_label_set_xalign(GTK_LABEL(label_info), 0.0f);
 
     hboxtop = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_box_pack_start(GTK_BOX(hboxtop), label_info, TRUE, TRUE, 0);
-    image_icon = gtk_image_new_from_pixbuf(get_icon_pixbuf());
+
+    GdkPixbuf* icon64 = get_icon_pixbuf(64);
+    image_icon = gtk_image_new_from_pixbuf(icon64);
+    g_object_unref(icon64);
     gtk_box_pack_start(GTK_BOX(hboxtop), image_icon, TRUE, TRUE, 0);
-  
+
     hbox1 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     label_pw = gtk_label_new_with_mnemonic("_Password:");
-    gtk_misc_set_alignment(GTK_MISC(label_pw), 0.0f, .5f);
+    gtk_label_set_xalign(GTK_LABEL(label_pw), 0.0f);
     gtk_box_pack_start(GTK_BOX(hbox1), label_pw, TRUE, TRUE, 0);
 
     check_button_toggle_newline = gtk_check_button_new_with_mnemonic("_Append newline to password text.");
@@ -226,10 +238,9 @@ int main(int argc, char *argv[] ) {
     gtk_label_set_mnemonic_widget(GTK_LABEL(label_pw), entry_pw);
     // Add entry_pw as custom data on window object:
     g_object_set_data(G_OBJECT(window), "entry_pw", entry_pw);
-  
+
     // Status label
-    label_status = gtk_label_new("No password set.");
-    /* gtk_misc_set_alignment(GTK_MISC(label_status), 0.0f, .5f); */
+    label_status = gtk_label_new("No password on clipboard.");
     // Set custom data object on window object, with key "label_status":
     g_object_set_data(G_OBJECT(window), "label_status", label_status);
 
@@ -250,10 +261,10 @@ int main(int argc, char *argv[] ) {
     gtk_box_pack_start(GTK_BOX(vbox), check_button_toggle_newline, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), label_status, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), button_quit, TRUE, TRUE, 0);
-  
+
     // Add vertical box container into top level window:
     gtk_container_add(GTK_CONTAINER(window), vbox);
-    
+
     /* The final step is to display this newly created widget hierarchy: */
     // call gtk_widget_show_all from root widget:
     gtk_widget_show_all(window);
@@ -270,9 +281,9 @@ int main(int argc, char *argv[] ) {
 
     /* All GTK applications must have a gtk_main(). Control ends here
      * and waits for an event to occur (like a key press or
-     * mouse event). */
-
+     * mouse event).
+     */
     gtk_main ();
-    
+
     return 0;
 }

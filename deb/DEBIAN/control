@@ -1,0 +1,10 @@
+Package: pwclip
+Version: %{VERSION}-1
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libgtk-3-0 (>= 3.18)
+Maintainer: Øyvind Stegard <oyvind@stegard.net>
+Description: Password to clipboard utility
+ When you need to cache a password on the clipboard,
+ use this utility.

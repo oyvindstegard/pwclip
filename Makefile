@@ -4,9 +4,12 @@
 # https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html
 #
 
-SHELL ::= /bin/sh
-CC ::= gcc
+# Version number (used only for deb target)
+PWCLIP_VERSION ::= 1.1
 
+SHELL ::= /bin/sh
+
+CC ::= gcc
 CFLAGS = -I. $(shell pkg-config --cflags gtk+-3.0) \
          -Wall -Wunused \
          -DG_DISABLE_DEPRECATED \
@@ -25,6 +28,7 @@ DATADIR ::= data
 
 OBJS := $(addprefix $(OBJDIR)/,pwclip.o data.o)
 
+# First rule builds main binary
 # $^: the names of all prerequisites, with spaces between them.
 $(OBJDIR)/pwclip: $(OBJS)
 	gcc -o $@ $^ $(CFLAGS) $(LIBS)
@@ -32,14 +36,9 @@ $(OBJDIR)/pwclip: $(OBJS)
 $(OBJDIR):
 	mkdir $(OBJDIR)
 
-# Resources
-data.h: $(DATADIR)/data.gresource.xml $(shell glib-compile-resources --sourcedir=$(DATADIR)/ --generate-dependencies $(DATADIR)/data.gresource.xml)
-	glib-compile-resources --sourcedir=$(DATADIR) --generate-header --target=data.h $(DATADIR)/data.gresource.xml
-DEPS += data.h
-
+# GResources
 data.c: $(DATADIR)/data.gresource.xml $(shell glib-compile-resources --sourcedir=data/ --generate-dependencies $(DATADIR)/data.gresource.xml)
 	glib-compile-resources --sourcedir=$(DATADIR) --generate-source --target=data.c $(DATADIR)/data.gresource.xml
-
 
 # General rule for compilation units:
 # $<: the name of the first prerequisite of an implicit rule
@@ -48,13 +47,26 @@ data.c: $(DATADIR)/data.gresource.xml $(shell glib-compile-resources --sourcedir
 $(OBJDIR)/%.o: %.c $(DEPS) | $(OBJDIR)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
+# Make a deb package (not suitable for public distribution)
+DEB_FILENAME ::= pwclip-$(PWCLIP_VERSION)_1.deb
+DEB_DIR ::= $(OBJDIR)/$(DEB_FILENAME:.deb=)
+.PHONY: deb
+deb: $(OBJDIR)/$(DEB_FILENAME)
+$(OBJDIR)/$(DEB_FILENAME): $(OBJDIR)/pwclip deb/DEBIAN/control
+	mkdir -p $(DEB_DIR)/DEBIAN
+	mkdir -p $(DEB_DIR)/usr/local/bin
+	cp $(OBJDIR)/pwclip $(DEB_DIR)/usr/local/bin
+	strip $(DEB_DIR)/usr/local/bin/pwclip
+	sed 's/%{VERSION}/$(PWCLIP_VERSION)/' deb/DEBIAN/control > $(DEB_DIR)/DEBIAN/control
+	fakeroot dpkg -b $(DEB_DIR)
+
 # Tags file
 .PHONY: tags
 tags: TAGS
 TAGS: *.[ch]
 	etags *.[ch]
 
-# Declare `clean' to be phony (not an object):
 .PHONY: clean
 clean:
+	rm -rf $(DEB_DIR)
 	rm -f $(OBJDIR)/*
