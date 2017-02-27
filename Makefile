@@ -70,6 +70,6 @@ TAGS: *.[ch]
 
 .PHONY: clean
 clean:
-	rm data.c
+	rm -f data.c
 	rm -rf $(DEB_DIR)
 	rm -f $(OBJDIR)/*
