@@ -48,7 +48,8 @@ $(OBJDIR)/%.o: %.c $(DEPS) | $(OBJDIR)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 # Make a deb package (not suitable for public distribution)
-DEB_FILENAME ::= pwclip-$(PWCLIP_VERSION)_1.deb
+DEB_ARCH ::= $(shell dpkg --print-architecture)
+DEB_FILENAME ::= pwclip_$(PWCLIP_VERSION)-1_$(DEB_ARCH).deb
 DEB_DIR ::= $(OBJDIR)/$(DEB_FILENAME:.deb=)
 .PHONY: deb
 deb: $(OBJDIR)/$(DEB_FILENAME)
@@ -57,7 +58,7 @@ $(OBJDIR)/$(DEB_FILENAME): $(OBJDIR)/pwclip deb/DEBIAN/control
 	mkdir -p $(DEB_DIR)/usr/local/bin
 	cp $(OBJDIR)/pwclip $(DEB_DIR)/usr/local/bin
 	strip $(DEB_DIR)/usr/local/bin/pwclip
-	sed -e 's/%{VERSION}/$(PWCLIP_VERSION)/' -e 's/%{ARCH}/$(shell dpkg --print-architecture)/' \
+	sed -e 's/%{VERSION}/$(PWCLIP_VERSION)/' -e 's/%{ARCH}/$(DEB_ARCH)/' \
 		deb/DEBIAN/control > $(DEB_DIR)/DEBIAN/control
 	fakeroot dpkg -b $(DEB_DIR)
 
