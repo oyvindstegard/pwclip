@@ -2,7 +2,7 @@ Package: pwclip
 Version: %{VERSION}-1
 Section: base
 Priority: optional
-Architecture: amd64
+Architecture: %{ARCH}
 Depends: libgtk-3-0 (>= 3.18)
 Maintainer: Øyvind Stegard <oyvind@stegard.net>
 Description: Password to clipboard utility

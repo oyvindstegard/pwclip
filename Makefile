@@ -57,7 +57,8 @@ $(OBJDIR)/$(DEB_FILENAME): $(OBJDIR)/pwclip deb/DEBIAN/control
 	mkdir -p $(DEB_DIR)/usr/local/bin
 	cp $(OBJDIR)/pwclip $(DEB_DIR)/usr/local/bin
 	strip $(DEB_DIR)/usr/local/bin/pwclip
-	sed 's/%{VERSION}/$(PWCLIP_VERSION)/' deb/DEBIAN/control > $(DEB_DIR)/DEBIAN/control
+	sed -e 's/%{VERSION}/$(PWCLIP_VERSION)/' -e 's/%{ARCH}/$(shell dpkg --print-architecture)/' \
+		deb/DEBIAN/control > $(DEB_DIR)/DEBIAN/control
 	fakeroot dpkg -b $(DEB_DIR)
 
 # Tags file
