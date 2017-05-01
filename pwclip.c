@@ -114,12 +114,25 @@ static void clipboard_status_handler(GtkClipboard *cb, GdkEvent *event, gpointer
 
 /* Moves window to top right corner */
 static void move_window(GtkWidget *window) {
-    GdkScreen *default_screen;
     gint width, height, screen_width;
-
     gtk_window_get_size(GTK_WINDOW(window), &width, &height);
-    default_screen = gdk_screen_get_default();
-    screen_width = gdk_screen_get_width(default_screen);
+
+#if GTK_CHECK_VERSION(3, 22, 0)
+    {
+        GdkDisplay *gdk_display = gtk_widget_get_display(window);
+        GdkWindow *gdk_window = gtk_widget_get_window(window);
+        GdkMonitor *gdk_monitor = gdk_display_get_monitor_at_window(gdk_display, gdk_window);
+        GdkRectangle gdk_rect;
+        gdk_monitor_get_geometry(gdk_monitor, &gdk_rect);
+        screen_width = gdk_rect.width;
+    }
+#else
+    {
+        GdkScreen *default_screen = gdk_screen_get_default();
+        screen_width = gdk_screen_get_width(default_screen);
+    }
+#endif
+
     gtk_window_move(GTK_WINDOW(window), screen_width - width - 10, 30);
 }
 
