@@ -79,13 +79,21 @@ static gboolean is_current_password_found_on_clipboard(GtkClipboard *cb, GtkEntr
 static GdkPixbuf* get_icon_pixbuf(int width) {
     GError* err = NULL;
     GdkPixbuf* icon;
-    icon = gdk_pixbuf_new_from_resource_at_scale(PWCLIP_ICON_RESOURCE, width, -1, TRUE, &err);
+    GdkPixbuf* icon_scaled;
+
+    icon = gdk_pixbuf_new_from_resource(PWCLIP_ICON_RESOURCE, &err);
+    float ratio = gdk_pixbuf_get_width(icon) / (float)gdk_pixbuf_get_height(icon);
+
     if (err != NULL) {
         g_fprintf(stderr, "Unable to load resource: %s\n", err->message);
         g_error_free(err);
         return NULL;
     }
-    return icon;
+
+    icon_scaled = gdk_pixbuf_scale_simple(icon, width, (int)(width/ratio), GDK_INTERP_BILINEAR);
+    g_object_unref(icon);
+
+    return icon_scaled;
 }
 
 /*

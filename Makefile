@@ -37,7 +37,7 @@ $(OBJDIR):
 	mkdir $(OBJDIR)
 
 # GResources
-data.c: $(DATADIR)/data.gresource.xml $(shell glib-compile-resources --sourcedir=data/ --generate-dependencies $(DATADIR)/data.gresource.xml)
+data.c: $(DATADIR)/data.gresource.xml $(shell glib-compile-resources --sourcedir=$(DATADIR) --generate-dependencies $(DATADIR)/data.gresource.xml)
 	glib-compile-resources --sourcedir=$(DATADIR) --generate-source --target=data.c $(DATADIR)/data.gresource.xml
 
 # General rule for compilation units:
