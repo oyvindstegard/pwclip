@@ -5,7 +5,7 @@
 #
 
 # Version number (used only for deb target)
-PWCLIP_VERSION ::= 1.1
+PWCLIP_VERSION ::= 1.2
 
 SHELL ::= /bin/sh
 
