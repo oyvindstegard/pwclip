@@ -197,7 +197,7 @@ int main(int argc, char *argv[] ) {
     gtk_window_set_title(GTK_WINDOW(window), "Password to clipboard");
     gtk_window_set_keep_above(GTK_WINDOW(window), TRUE);
     gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
-    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
+    //gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
     gtk_window_stick(GTK_WINDOW(window));
 
     set_window_icon(window);
@@ -298,7 +298,7 @@ int main(int argc, char *argv[] ) {
     /* gtk_widget_show (window); */
 
     /* move window after showing it, to get size calculations correct. */
-    move_window(window);
+    //move_window(window);
 
     /* All GTK applications must have a gtk_main(). Control ends here
      * and waits for an event to occur (like a key press or
